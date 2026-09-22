@@ -20,8 +20,14 @@ Buka `http://localhost:5173`. Pastikan API berjalan di `http://localhost:4000` a
 - Admin: `admin@carchery.id` / `password`
 
 ## Main flows
-Overview -> New booking -> pilih range, tanggal, waktu, lane, durasi, equipment -> Continue to checkout.
-My bookings menampilkan riwayat dan cancellation action. Admin desk menampilkan seluruh booking setelah login admin.
+Guest -> Sign in/Register -> Overview -> New booking -> pilih range, tanggal, waktu, lane, durasi, equipment -> Continue to checkout.
+My bookings menampilkan riwayat, search, status filter, dan cancellation action. Admin desk menampilkan seluruh booking serta CRUD bow rental setelah login admin.
+
+## Project structure
+- `src/App.jsx`: application shell and member booking flow
+- `src/components/AdminPanel.jsx`: authenticated admin catalog CRUD
+- `src/main.jsx`: React bootstrap
+- `src/styles.css`, `src/ui-states.css`, `src/admin-styles.css`: responsive visual system and state styles
 
 ## Deployment
 Deploy folder ini ke Vercel/Netlify sebagai Vite app. Set environment variable `VITE_API_URL` ke URL backend yang sudah dideploy, misalnya `https://carchery-api.onrender.com/api`, lalu trigger redeploy.
