@@ -47,3 +47,4 @@ Vercel settings: Framework `Vite`, Build command `npm run build`, Output directo
 ## Screenshots
 ![C'Archery dashboard](docs/dashboard.png)
 ![C'Archery booking flow](docs/booking.png)
+![C'Archery admin desk](docs/admin.png)
