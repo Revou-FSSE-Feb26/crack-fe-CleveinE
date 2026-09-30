@@ -21,8 +21,11 @@ import {
   X,
 } from "lucide-react";
 import AdminPanel from "./components/AdminPanel";
+import AuthPage from "./components/AuthPage";
+import PublicHome from "./components/PublicHome";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+const today = new Date().toISOString().slice(0, 10);
 const money = (value) =>
   new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -44,7 +47,13 @@ async function request(path, options = {}) {
     },
     ...options,
   });
-  const body = response.status === 204 ? null : await response.json();
+  const contentType = response.headers.get("content-type") || "";
+  const body =
+    response.status === 204
+      ? null
+      : contentType.includes("application/json")
+        ? await response.json()
+        : null;
   if (!response.ok) throw new Error(body?.message || "Something went wrong");
   return body;
 }
@@ -63,7 +72,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("overview");
   const [venueId, setVenueId] = useState("outdoor");
-  const [date, setDate] = useState("2026-09-24");
+  const [date, setDate] = useState(today);
   const [time, setTime] = useState("16:00");
   const [laneId, setLaneId] = useState("O2");
   const [duration, setDuration] = useState(2);
@@ -74,7 +83,8 @@ function App() {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [authOpen, setAuthOpen] = useState(false);
+  const [authPage, setAuthPage] = useState(null);
+  const [authSubmitting, setAuthSubmitting] = useState(false);
   const [authMode, setAuthMode] = useState("login");
   const [authForm, setAuthForm] = useState({
     name: "",
@@ -100,21 +110,47 @@ function App() {
   }, []);
   useEffect(() => {
     if (venueId && date)
-      request(`/availability?venueId=${venueId}&date=${date}`).then((data) => {
-        setReserved(data.reserved);
-        if (data.reserved.includes(laneId))
-          setLaneId(
-            data.lanes.find((lane) => !data.reserved.includes(lane.id))?.id ||
-              data.lanes[0].id,
-          );
-      });
+      request(`/availability?venueId=${venueId}&date=${date}`)
+        .then((data) => {
+          setReserved(data.reserved);
+          if (data.reserved.includes(laneId))
+            setLaneId(
+              data.lanes.find((lane) => !data.reserved.includes(lane.id))?.id ||
+                data.lanes[0].id,
+            );
+        })
+        .catch((error) => setNotice({ type: "error", text: error.message }));
   }, [venueId, date]);
   useEffect(() => {
-    if (token)
-      request("/bookings", { token })
-        .then(setBookings)
-        .catch(() => {});
-    else setBookings([]);
+    if (!token) {
+      setBookings([]);
+      return;
+    }
+    let current = true;
+    request("/me", { token })
+      .then((currentUser) => {
+        if (!current) return null;
+        setUser(currentUser);
+        localStorage.setItem("carchery-user", JSON.stringify(currentUser));
+        return request("/bookings", { token });
+      })
+      .then((items) => {
+        if (current && items) setBookings(items);
+      })
+      .catch((error) => {
+        if (!current) return;
+        setUser(null);
+        setToken("");
+        localStorage.removeItem("carchery-user");
+        localStorage.removeItem("carchery-token");
+        setNotice({
+          type: "error",
+          text: `Please sign in again. ${error.message}`,
+        });
+      });
+    return () => {
+      current = false;
+    };
   }, [token]);
   const filteredBookings = useMemo(
     () =>
@@ -144,7 +180,7 @@ function App() {
           text: "Please sign in before creating a booking.",
         });
         setAuthMode("login");
-        setAuthOpen(true);
+        setAuthPage("login");
         return;
       }
       await request("/bookings", {
@@ -188,11 +224,12 @@ function App() {
       }),
     });
     setSession(result.user, result.token);
-    setAuthOpen(false);
+    setAuthPage(null);
     setNotice({ type: "success", text: `Welcome back, ${result.user.name}.` });
   }
   async function submitAuth(event) {
     event.preventDefault();
+    setAuthSubmitting(true);
     try {
       if (authMode === "login") await login();
       else {
@@ -201,7 +238,7 @@ function App() {
           body: JSON.stringify(authForm),
         });
         setSession(result.user, result.token);
-        setAuthOpen(false);
+        setAuthPage(null);
         setNotice({
           type: "success",
           text: "Account created. Your range is ready.",
@@ -209,7 +246,61 @@ function App() {
       }
     } catch (error) {
       setNotice({ type: "error", text: error.message });
+    } finally {
+      setAuthSubmitting(false);
     }
+  }
+
+  if (!user) {
+    if (loading)
+      return (
+        <div className="public-loading">
+          <div className="loader" />
+          <p>Preparing the range</p>
+        </div>
+      );
+    if (authPage)
+      return (
+        <AuthPage
+          mode={authMode}
+          setMode={setAuthMode}
+          form={authForm}
+          setForm={setAuthForm}
+          onSubmit={submitAuth}
+          onBack={() => {
+            setAuthPage(null);
+            setNotice(null);
+          }}
+          submitting={authSubmitting}
+          notice={notice}
+          onDismiss={() => setNotice(null)}
+        />
+      );
+    return (
+      <PublicHome
+        venues={venues}
+        bows={bows}
+        weather={weather}
+        notice={notice}
+        onDismiss={() => setNotice(null)}
+        onSignIn={() => {
+          setAuthMode("login");
+          setAuthPage("login");
+        }}
+        onRegister={() => {
+          setAuthMode("register");
+          setAuthPage("register");
+        }}
+        onBook={() => {
+          setNotice({
+            type: "info",
+            text: "Sign in or create an account to reserve a lane.",
+          });
+          setAuthMode("login");
+          setAuthPage("login");
+        }}
+      />
+    );
   }
 
   return (
@@ -270,7 +361,8 @@ function App() {
               onClick={() => {
                 setToken("");
                 setUser(null);
-                localStorage.clear();
+                localStorage.removeItem("carchery-user");
+                localStorage.removeItem("carchery-token");
               }}
             >
               <LogOut size={16} />
@@ -303,17 +395,6 @@ function App() {
             <button className="icon-button">
               <Search size={18} />
             </button>
-            {!token && (
-              <button
-                className="header-login"
-                onClick={() => {
-                  setAuthMode("login");
-                  setAuthOpen(true);
-                }}
-              >
-                Sign in
-              </button>
-            )}
             <div className="top-avatar">
               {user?.name?.slice(0, 2).toUpperCase() || "AP"}
             </div>
@@ -412,82 +493,6 @@ function App() {
           </span>
         </footer>
       </main>
-      {authOpen && (
-        <div className="modal-backdrop" onClick={() => setAuthOpen(false)}>
-          <form
-            className="auth-modal"
-            onSubmit={submitAuth}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="modal-close"
-              onClick={() => setAuthOpen(false)}
-            >
-              <X size={17} />
-            </button>
-            <p className="eyebrow">C'ARCHERY MEMBERSHIP</p>
-            <h2>
-              {authMode === "login" ? "Welcome back." : "Join the range."}
-            </h2>
-            <p className="modal-copy">
-              {authMode === "login"
-                ? "Sign in to manage your sessions."
-                : "Create an account and start finding your line."}
-            </p>
-            {authMode === "register" && (
-              <label>
-                Name
-                <input
-                  required
-                  value={authForm.name}
-                  onChange={(event) =>
-                    setAuthForm({ ...authForm, name: event.target.value })
-                  }
-                />
-              </label>
-            )}
-            <label>
-              Email
-              <input
-                required
-                type="email"
-                value={authForm.email}
-                onChange={(event) =>
-                  setAuthForm({ ...authForm, email: event.target.value })
-                }
-              />
-            </label>
-            <label>
-              Password
-              <input
-                required
-                minLength="6"
-                type="password"
-                value={authForm.password}
-                onChange={(event) =>
-                  setAuthForm({ ...authForm, password: event.target.value })
-                }
-              />
-            </label>
-            <button className="primary-button full" type="submit">
-              {authMode === "login" ? "Sign in" : "Create account"}{" "}
-              <ArrowRight size={16} />
-            </button>
-            <button
-              type="button"
-              className="modal-switch"
-              onClick={() =>
-                setAuthMode(authMode === "login" ? "register" : "login")
-              }
-            >
-              {authMode === "login"
-                ? "New to C’Archery? Create an account"
-                : "Already a member? Sign in"}
-            </button>
-          </form>
-        </div>
-      )}
     </div>
   );
 }
@@ -499,7 +504,9 @@ function Overview({ user, bookings, weather, onNew, onBookings }) {
       <section className="hero">
         <div>
           <p className="eyebrow">
-            {user?.role === "admin" ? "CONTROL CENTER" : "GOOD AFTERNOON, ALYA"}
+            {user?.role === "admin"
+              ? "CONTROL CENTER"
+              : `GOOD AFTERNOON, ${user?.name?.split(" ")[0]?.toUpperCase() || "ARCHER"}`}
           </p>
           <h1>
             Make time for
@@ -706,7 +713,7 @@ function BookingForm({
                   type="date"
                   value={date}
                   onChange={(event) => setDate(event.target.value)}
-                  min="2026-09-20"
+                  min={today}
                 />
               </label>
               <label>
@@ -848,7 +855,14 @@ function BookingForm({
   );
 }
 
-function Bookings({ bookings, search, setSearch, statusFilter, setStatusFilter, onCancel }) {
+function Bookings({
+  bookings,
+  search,
+  setSearch,
+  statusFilter,
+  setStatusFilter,
+  onCancel,
+}) {
   return (
     <>
       <div className="page-title">
@@ -865,7 +879,11 @@ function Bookings({ bookings, search, setSearch, statusFilter, setStatusFilter, 
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
-        <select className="status-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+        <select
+          className="status-filter"
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+        >
           <option value="all">All statuses</option>
           <option value="confirmed">Confirmed</option>
           <option value="completed">Completed</option>
@@ -923,7 +941,16 @@ function Bookings({ bookings, search, setSearch, statusFilter, setStatusFilter, 
   );
 }
 
-function Admin({ bookings, bows, search, setSearch, onCancel, onBowsChange, token, onNotice }) {
+function Admin({
+  bookings,
+  bows,
+  search,
+  setSearch,
+  onCancel,
+  onBowsChange,
+  token,
+  onNotice,
+}) {
   const isEmpty = !bookings.length;
   return (
     <>
@@ -933,7 +960,9 @@ function Admin({ bookings, bows, search, setSearch, onCancel, onBowsChange, toke
           <h1>Admin desk</h1>
           <p>Keep the range moving with a clear view of every booking.</p>
         </div>
-        <span className="tag green"><ShieldCheck size={14} /> Admin access</span>
+        <span className="tag green">
+          <ShieldCheck size={14} /> Admin access
+        </span>
       </div>
       <div className="admin-stats">
         <div>
@@ -954,7 +983,12 @@ function Admin({ bookings, bows, search, setSearch, onCancel, onBowsChange, toke
           <span>Across 10 lanes</span>
         </div>
       </div>
-      <AdminPanel bows={bows} token={token} onBowsChange={onBowsChange} onNotice={onNotice} />
+      <AdminPanel
+        bows={bows}
+        token={token}
+        onBowsChange={onBowsChange}
+        onNotice={onNotice}
+      />
       <div className="table-wrap">
         <div className="list-toolbar">
           <h2>All bookings</h2>

@@ -24,10 +24,24 @@ Guest -> Sign in/Register -> Overview -> New booking -> pilih range, tanggal, wa
 My bookings menampilkan riwayat, search, status filter, dan cancellation action. Admin desk menampilkan seluruh booking serta CRUD bow rental setelah login admin.
 
 ## Project structure
-- `src/App.jsx`: application shell and member booking flow
+- `src/styles.css`: global palette, typography, spacing, and responsive dashboard styles
+- `src/public-styles.css`: public homepage/auth layouts and global reusable control styles
+- `src/components/ui/`: reusable `Button`, `TextField`, and `Surface` primitives
+- `src/components/PublicHome.jsx`: public landing page with live range, bow, and weather sections
+- `src/components/AuthPage.jsx`: standalone login/register forms
+- `src/App.jsx`: authenticated application shell and member booking flow
 - `src/components/AdminPanel.jsx`: authenticated admin catalog CRUD
 - `src/main.jsx`: React bootstrap
 - `src/styles.css`, `src/ui-states.css`, `src/admin-styles.css`: responsive visual system and state styles
+
+## Implementation order
+1. Global palette, typography, and responsive styling.
+2. Reusable button, input, and surface components.
+3. Standalone sign-in and registration forms.
+4. Public homepage with navigation, range/equipment sections, and footer.
+5. Member booking/history and admin management screens.
+6. Connect live API data, role-based access, loading/errors, and booking actions.
+7. Browser checks and screenshots for guest, member, booking, and admin views.
 
 ## Deployment
 Deploy folder ini ke Vercel/Netlify sebagai Vite app. Set environment variable `VITE_API_URL` ke URL backend yang sudah dideploy, misalnya `https://carchery-api.onrender.com/api`, lalu trigger redeploy.
@@ -37,7 +51,7 @@ Vercel settings: Framework `Vite`, Build command `npm run build`, Output directo
 ## Rubric checklist
 - Responsive member dashboard, booking flow, booking history, cancellation, search, weather, and admin desk.
 - Two roles: `user` and `admin`; the admin navigation is protected by the authenticated role returned by the API.
-- Loading state, API error notices, empty states, form validation, and mobile navigation are included.
+- Loading state, API error notices, empty states, form validation, token revalidation, and mobile navigation are included.
 - Service/range data is loaded from the backend; no booking data is hard-coded in the UI.
 
 ## Deployment links
@@ -45,6 +59,8 @@ Vercel settings: Framework `Vite`, Build command `npm run build`, Output directo
 - Backend API: `https://carchery-api.onrender.com` (replace with the team's actual deployment URL)
 
 ## Screenshots
+![C'Archery public homepage](docs/homepage.png)
+![C'Archery login screen](docs/login.png)
 ![C'Archery dashboard](docs/dashboard.png)
 ![C'Archery booking flow](docs/booking.png)
 ![C'Archery admin desk](docs/admin.png)
