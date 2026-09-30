@@ -59,9 +59,7 @@ async function request(path, options = {}) {
 }
 
 function App() {
-  const [user, setUser] = useState(() =>
-    JSON.parse(localStorage.getItem("carchery-user") || "null"),
-  );
+  const [user, setUser] = useState(null);
   const [token, setToken] = useState(
     () => localStorage.getItem("carchery-token") || "",
   );
@@ -124,6 +122,8 @@ function App() {
   useEffect(() => {
     if (!token) {
       setBookings([]);
+      setUser(null);
+      localStorage.removeItem("carchery-user");
       return;
     }
     let current = true;
